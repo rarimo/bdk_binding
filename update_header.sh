@@ -1,0 +1,1 @@
+cbindgen --config cbindgen.toml --crate bdk_binding --output bdk_binding.h
