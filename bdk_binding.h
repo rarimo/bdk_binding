@@ -7,3 +7,5 @@
 #include "stdint.h"
 
 uint8_t *bdk_get_public_key(const uint8_t *data, uintptr_t len, uintptr_t *out_len);
+
+uint8_t *bdk_get_address(const uint8_t *data, uintptr_t len, uintptr_t *out_len);
