@@ -84,7 +84,8 @@ fn get_address(private_key_data: Vec<u8>) -> String {
     let secp = Secp256k1::new();
     let public_key = private_key.public_key(&secp);
 
-    let address = Address::p2pkh(&public_key, Network::Bitcoin);
+    let address = Address::p2wpkh(&public_key, Network::Regtest)
+        .expect("Failed to create address from public key");
 
     return address.to_string();
 }
