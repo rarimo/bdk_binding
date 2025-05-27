@@ -2,6 +2,9 @@ use std::ffi::{CString, c_char};
 
 use bdk::bitcoin::{Address, Network, PrivateKey, key::Secp256k1};
 
+use std::alloc::{self, Layout};
+use std::mem;
+
 #[unsafe(no_mangle)]
 pub extern "C" fn bdk_get_public_key(data: *const u8, len: usize, out_len: *mut usize) -> *mut u8 {
     let private_key_data = unsafe {
@@ -11,14 +14,29 @@ pub extern "C" fn bdk_get_public_key(data: *const u8, len: usize, out_len: *mut 
 
     let public_key = get_public_key(private_key_data.to_vec());
 
-    let output_ptr = public_key.as_ptr() as *mut u8;
-
-    unsafe {
-        *out_len = public_key.len();
+    unsafe { *out_len = public_key.len() };
+    let ptr = bdk_alloc(public_key.len());
+    if ptr.is_null() {
+        return std::ptr::null_mut();
     }
 
-    output_ptr
+    unsafe {
+        std::ptr::copy_nonoverlapping(public_key.as_ptr(), ptr, public_key.len());
+    }
+
+    ptr
 }
+
+//     let enc = unsafe { &*codec }.encode(slice);
+//     unsafe { *out_len = enc.len() };
+//     let ptr = rs_alloc(enc.len());
+//     if ptr.is_null() {
+//         return std::ptr::null_mut();
+//     }
+//     unsafe {
+//         std::ptr::copy_nonoverlapping(enc.as_ptr(), ptr, enc.len());
+//     }
+//     ptr
 
 #[unsafe(no_mangle)]
 pub extern "C" fn bdk_get_address(data: *const u8, len: usize) -> *const c_char {
@@ -31,6 +49,22 @@ pub extern "C" fn bdk_get_address(data: *const u8, len: usize) -> *const c_char 
 
     let c_string = CString::new(address).expect("CString::new failed");
     c_string.into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bdk_alloc(len: usize) -> *mut u8 {
+    unsafe {
+        let layout = Layout::from_size_align_unchecked(len, mem::align_of::<u8>());
+        alloc::alloc(layout)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn bdk_dealloc(ptr: *mut u8, len: usize) {
+    unsafe {
+        let layout = Layout::from_size_align_unchecked(len, mem::align_of::<u8>());
+        alloc::dealloc(ptr, layout);
+    }
 }
 
 fn get_public_key(private_key_data: Vec<u8>) -> Vec<u8> {
