@@ -1,2 +1,7 @@
 language    = "C"
 pragma_once = true
+
+includes = ["stdint.h"]
+
+[export]
+include = ["bdk_*"]
