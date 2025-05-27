@@ -1,3 +1,5 @@
+use std::ffi::{CString, c_char};
+
 use bdk::bitcoin::{Address, Network, PrivateKey, key::Secp256k1};
 
 #[unsafe(no_mangle)]
@@ -19,7 +21,7 @@ pub extern "C" fn bdk_get_public_key(data: *const u8, len: usize, out_len: *mut 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn bdk_get_address(data: *const u8, len: usize, out_len: *mut usize) -> *mut u8 {
+pub extern "C" fn bdk_get_address(data: *const u8, len: usize) -> *const c_char {
     let private_key_data = unsafe {
         assert!(!data.is_null(), "Input data pointer is null");
         std::slice::from_raw_parts(data, len)
@@ -27,13 +29,8 @@ pub extern "C" fn bdk_get_address(data: *const u8, len: usize, out_len: *mut usi
 
     let address = get_address(private_key_data.to_vec());
 
-    let output_ptr = address.as_ptr() as *mut u8;
-
-    unsafe {
-        *out_len = address.len();
-    }
-
-    output_ptr
+    let c_string = CString::new(address).expect("CString::new failed");
+    c_string.into_raw()
 }
 
 fn get_public_key(private_key_data: Vec<u8>) -> Vec<u8> {
@@ -61,10 +58,12 @@ fn get_address(private_key_data: Vec<u8>) -> String {
 mod tests {
     #[test]
     fn test_get_address() {
-        let privateKey =
+        let private_key =
             hex::decode("23d4a09295be678b21a5f1dceae1f634a69c1b41775f680ebf8165266471401b")
                 .unwrap();
 
-        let address = super::get_address(privateKey);
+        let address = super::get_address(private_key).as_bytes().to_vec();
+
+        println!("Address: {}", hex::encode(address));
     }
 }
