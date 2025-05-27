@@ -46,7 +46,7 @@ fn get_public_key(private_key_data: Vec<u8>) -> Vec<u8> {
     return public_key.to_bytes();
 }
 
-fn get_address(private_key_data: Vec<u8>) -> Vec<u8> {
+fn get_address(private_key_data: Vec<u8>) -> String {
     let private_key = PrivateKey::from_slice(&private_key_data, Network::Regtest)
         .expect("Failed to create PrivateKey from slice");
 
@@ -55,5 +55,16 @@ fn get_address(private_key_data: Vec<u8>) -> Vec<u8> {
 
     let address = Address::p2pkh(&public_key, Network::Bitcoin);
 
-    return address.to_string().as_bytes().to_vec();
+    return address.to_string();
+}
+
+mod tests {
+    #[test]
+    fn test_get_address() {
+        let privateKey =
+            hex::decode("23d4a09295be678b21a5f1dceae1f634a69c1b41775f680ebf8165266471401b")
+                .unwrap();
+
+        let address = super::get_address(privateKey);
+    }
 }
