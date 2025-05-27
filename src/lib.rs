@@ -1,6 +1,6 @@
 use bdk::bitcoin::{Network, PrivateKey, key::Secp256k1};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn bdk_get_public_key(data: *const u8, len: usize, out_len: *mut usize) -> *mut u8 {
     let private_key_data = unsafe {
         assert!(!data.is_null(), "Input data pointer is null");
