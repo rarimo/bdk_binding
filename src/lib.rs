@@ -6,13 +6,20 @@ use std::alloc::{self, Layout};
 use std::mem;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn bdk_get_public_key(data: *const u8, len: usize, out_len: *mut usize) -> *mut u8 {
+pub extern "C" fn bdk_get_public_key(
+    data: *const u8,
+    len: usize,
+    network_id: u8,
+    out_len: *mut usize,
+) -> *mut u8 {
     let private_key_data = unsafe {
         assert!(!data.is_null(), "Input data pointer is null");
         std::slice::from_raw_parts(data, len)
     };
 
-    let public_key = get_public_key(private_key_data.to_vec());
+    let network = get_network(network_id);
+
+    let public_key = get_public_key(private_key_data.to_vec(), network);
 
     unsafe { *out_len = public_key.len() };
     let ptr = bdk_alloc(public_key.len());
@@ -27,25 +34,16 @@ pub extern "C" fn bdk_get_public_key(data: *const u8, len: usize, out_len: *mut 
     ptr
 }
 
-//     let enc = unsafe { &*codec }.encode(slice);
-//     unsafe { *out_len = enc.len() };
-//     let ptr = rs_alloc(enc.len());
-//     if ptr.is_null() {
-//         return std::ptr::null_mut();
-//     }
-//     unsafe {
-//         std::ptr::copy_nonoverlapping(enc.as_ptr(), ptr, enc.len());
-//     }
-//     ptr
-
 #[unsafe(no_mangle)]
-pub extern "C" fn bdk_get_address(data: *const u8, len: usize) -> *const c_char {
+pub extern "C" fn bdk_get_address(data: *const u8, len: usize, network_id: u8) -> *const c_char {
     let private_key_data = unsafe {
         assert!(!data.is_null(), "Input data pointer is null");
         std::slice::from_raw_parts(data, len)
     };
 
-    let address = get_address(private_key_data.to_vec());
+    let network = get_network(network_id);
+
+    let address = get_address(private_key_data.to_vec(), network);
 
     let c_string = CString::new(address).expect("CString::new failed");
     c_string.into_raw()
@@ -67,8 +65,8 @@ pub extern "C" fn bdk_dealloc(ptr: *mut u8, len: usize) {
     }
 }
 
-fn get_public_key(private_key_data: Vec<u8>) -> Vec<u8> {
-    let private_key = PrivateKey::from_slice(&private_key_data, Network::Regtest)
+fn get_public_key(private_key_data: Vec<u8>, network: Network) -> Vec<u8> {
+    let private_key = PrivateKey::from_slice(&private_key_data, network)
         .expect("Failed to create PrivateKey from slice");
 
     let secp = Secp256k1::new();
@@ -77,17 +75,26 @@ fn get_public_key(private_key_data: Vec<u8>) -> Vec<u8> {
     return public_key.to_bytes();
 }
 
-fn get_address(private_key_data: Vec<u8>) -> String {
-    let private_key = PrivateKey::from_slice(&private_key_data, Network::Regtest)
+fn get_address(private_key_data: Vec<u8>, network: Network) -> String {
+    let private_key = PrivateKey::from_slice(&private_key_data, network)
         .expect("Failed to create PrivateKey from slice");
 
     let secp = Secp256k1::new();
     let public_key = private_key.public_key(&secp);
 
-    let address = Address::p2wpkh(&public_key, Network::Regtest)
-        .expect("Failed to create address from public key");
+    let address =
+        Address::p2wpkh(&public_key, network).expect("Failed to create address from public key");
 
     return address.to_string();
+}
+
+fn get_network(network_id: u8) -> Network {
+    match network_id {
+        0 => Network::Bitcoin,
+        1 => Network::Testnet,
+        2 => Network::Regtest,
+        _ => panic!("Unsupported network ID"),
+    }
 }
 
 mod tests {
@@ -97,8 +104,18 @@ mod tests {
             hex::decode("23d4a09295be678b21a5f1dceae1f634a69c1b41775f680ebf8165266471401b")
                 .unwrap();
 
-        let address = super::get_address(private_key).as_bytes().to_vec();
+        let address = super::get_address(private_key, bdk::bitcoin::Network::Regtest)
+            .as_bytes()
+            .to_vec();
 
         println!("Address: {}", hex::encode(address));
+    }
+
+    #[test]
+    fn test_serialization() {
+        let network_json = serde_json::to_string(&bdk::bitcoin::Network::Regtest)
+            .expect("Failed to serialize Network::Regtest");
+
+        println!("Serialized: {}", network_json);
     }
 }
